@@ -26,7 +26,7 @@ const (
 	REDUCE  WorkerType = "reduce"
 )
 
-const TIMEQUANTA = 1000 * time.Millisecond
+const TIMEQUANTA = 300 * time.Millisecond
 
 // ByKey for sorting by key.
 type ByKey []string

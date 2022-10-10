@@ -74,7 +74,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			// Send failed task to coordinator
 		}
 		ackTime := 0 * TIMEQUANTA
-	ACK:
+	SYN:
 		ok = TaskACK(id, task, sno)
 
 		if !ok {
@@ -82,10 +82,10 @@ func Worker(mapf func(string, string) []KeyValue,
 			if ackTime > 100*TIMEQUANTA {
 				log.Fatalf("[worker] exiting\n")
 			}
-			log.Printf("[worker] [ACK] retrying in %v milliseconds...\n", TIMEQUANTA/time.Millisecond)
+			log.Printf("[worker] [SYN] retrying in %v milliseconds...\n", TIMEQUANTA/time.Millisecond)
 			ackTime += TIMEQUANTA
 			time.Sleep(TIMEQUANTA)
-			goto ACK
+			goto SYN
 		}
 	}
 }
@@ -124,7 +124,7 @@ func RunMapTask(mapf func(string, string) []KeyValue, fileName string, sno int, 
 	ofile := make([]*os.File, nReduceTask)
 	for reduceWorkerIdx := 0; reduceWorkerIdx < nReduceTask; reduceWorkerIdx++ {
 		oname := fmt.Sprintf("mr-intermediate-%v-%v", sno, reduceWorkerIdx)
-		ofile[reduceWorkerIdx], err = os.OpenFile(oname, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		ofile[reduceWorkerIdx], err = os.OpenFile(oname, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatalf("[worker-%v] [map] can't create file. exiting...", sno)
 		}

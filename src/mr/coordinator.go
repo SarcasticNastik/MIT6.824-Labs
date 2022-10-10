@@ -265,8 +265,7 @@ func (c *Coordinator) RegisterWorker(args *GetTaskArgs, reply *GetTaskReply) err
 }
 
 // WorkerACK Lock only places where data race can occur, i.e. make them atomic
-// # Optimization:
-//   - Worker can send FAIL. Update the status right after. No need for waiting.
+// # Optimization:SYN//   - Worker can send FAIL. Update the status right after. No need for waiting.
 func (c *Coordinator) WorkerACK(args *PutTaskArgs, reply *PutTaskReply) error {
 	log.Printf("[coordinator] [worker-%v] SYN received \n", args.Sno)
 	switch args.Task {
@@ -277,19 +276,26 @@ func (c *Coordinator) WorkerACK(args *PutTaskArgs, reply *PutTaskReply) error {
 	case MAP:
 		taskNo := args.Sno
 		c.mu.Lock()
+		if taskNo >= len(c.files) {
+			log.Printf("[coordinator] [map] [worker-%d] [SYN] malformed sno\n", taskNo)
+			reply.ACK = false
+			return errors.New(fmt.Sprintf("[worker-%v] [SYN] malformed sno\n", taskNo))
+		}
 		processedFile := c.files[taskNo]
 		workerDetails, exists := c.mapTask[processedFile]
+
 		c.mu.Unlock()
 		// confirm existence of worker
 		if !exists {
 			log.Printf("[coordinator] [map] [worker-%d] [SYN] malformed sno\n", taskNo)
+			log.Printf("[coordinator] [map] [worker-%v] [SYN] worker details: %v\n", workerDetails)
 			reply.ACK = false
 			return errors.New("[worker] [SYN] malformed sno\n")
 		}
 
 		// 		* Confirm workerID
 		if string(workerDetails.workerID) != string(args.WorkerID) {
-			log.Printf("[coordinator] [map] [SYN] task not assigned to worker with id #%v\n", args.WorkerID)
+			log.Printf("[coordinator] [map] [SYN] task not assigned to worker with id #%v\n", string(args.WorkerID))
 			reply.ACK = false
 			return errors.New("[coordinator] [map] [SYN] task not assigned to the worker\n")
 		}
@@ -423,10 +429,7 @@ func (c *Coordinator) server() {
 	rpc.HandleHTTP()
 	//l, e := net.Listen("tcp", ":1234")
 	sockname := coordinatorSock()
-	err := os.Remove(sockname)
-	if err != nil {
-		log.Fatal("[sock] permission error:", err)
-	}
+	os.Remove(sockname)
 	l, e := net.Listen("unix", sockname)
 	if e != nil {
 		log.Fatal("listen error:", e)
